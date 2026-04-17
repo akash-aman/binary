@@ -52,13 +52,21 @@ cd "$BUILD_DIR"
 tar xzf "$LIBEVENT_TAR"
 cd "libevent-$LIBEVENT_VERSION"
 
+# Older libevent samples have pointer-type issues with newer GCC on Windows.
+# Suppress the warning-as-error since we only need the static library.
+LIBEVENT_CFLAGS=""
+if [ "$PLATFORM" = "windows-amd64" ]; then
+    LIBEVENT_CFLAGS="-Wno-error=incompatible-pointer-types"
+fi
+
 ./configure \
     --prefix="$LIBEVENT_PREFIX" \
     --disable-shared \
     --enable-static \
     --disable-openssl \
     --disable-debug-mode \
-    --quiet
+    --quiet \
+    ${LIBEVENT_CFLAGS:+CFLAGS="$LIBEVENT_CFLAGS"}
 
 make -j"$JOBS"
 make install
