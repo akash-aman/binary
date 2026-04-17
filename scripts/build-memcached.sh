@@ -101,21 +101,25 @@ echo "[4/4] Compiling Memcached $VERSION..."
 
 case "$PLATFORM" in
     linux-amd64)
-        # Fully static build on Linux
+        # Static build on Linux
+        # Disable -Werror for deprecated-declarations (sigignore in older memcached)
         ./configure \
             --with-libevent="$LIBEVENT_PREFIX" \
             --disable-coverage \
             --disable-docs \
             --quiet \
+            CFLAGS="-O2 -pthread -Wall -Wno-error=deprecated-declarations" \
             LDFLAGS="-static"
         ;;
     darwin-arm64)
         # macOS: static libevent, dynamic system libs
+        # Disable -Werror for deprecated-declarations (sigignore in older memcached)
         ./configure \
             --with-libevent="$LIBEVENT_PREFIX" \
             --disable-coverage \
             --disable-docs \
-            --quiet
+            --quiet \
+            CFLAGS="-O2 -pthread -Wall -Wno-error=deprecated-declarations"
         ;;
     *)
         echo "✗ Unknown platform: $PLATFORM"

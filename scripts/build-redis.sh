@@ -39,10 +39,12 @@ echo "[2/3] Compiling..."
 
 case "$PLATFORM" in
     linux-amd64)
-        # Fully static build on Linux
+        # Static build on Linux
+        # Use REDIS_LDFLAGS (not LDFLAGS) to avoid breaking dependency builds (xxhash, hiredis)
         make -j"$JOBS" \
             MALLOC=libc \
-            LDFLAGS="-static"
+            REDIS_CFLAGS="-static" \
+            REDIS_LDFLAGS="-static"
         ;;
     darwin-arm64)
         # macOS: dynamic system libs (Apple doesn't allow fully static)
