@@ -45,12 +45,8 @@ jobs:
                       NEEDS_BUILD=false
                       MISSING=""
 
-                      for platform in linux-amd64 darwin-arm64 windows-amd64; do
-                        if [ "$platform" = "windows-amd64" ]; then
-                          path="${software}/${platform}/${version}/${CHECK_FILE}.exe"
-                        else
-                          path="${software}/${platform}/${version}/${CHECK_FILE}"
-                        fi
+                      for platform in linux-amd64 darwin-arm64; do
+                        path="${software}/${platform}/${version}/${CHECK_FILE}"
 
                         if [ -z "$EXISTING" ] || ! echo "$EXISTING" | grep -Fxq "$path"; then
                           NEEDS_BUILD=true

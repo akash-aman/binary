@@ -23,10 +23,7 @@ jobs:
                       runner: ubuntu-latest
                     - platform: darwin-arm64
                       runner: macos-14
-                    - platform: windows-amd64
-                      runner: windows-latest
         runs-on: ${{ matrix.runner }}
-        continue-on-error: ${{ matrix.platform == 'windows-amd64' }}
         steps:
             - uses: actions/checkout@v4
 
@@ -41,31 +38,9 @@ jobs:
               run: |
                   brew install autoconf automake libtool pkg-config 2>/dev/null || true
 
-            - name: Setup MSYS2 (Windows)
-              if: runner.os == 'Windows'
-              uses: msys2/setup-msys2@v2
-              with:
-                  msystem: MINGW64
-                  update: true
-                  install: >-
-                      mingw-w64-x86_64-gcc
-                      mingw-w64-x86_64-make
-                      make
-                      pkg-config
-                      autoconf
-                      automake
-                      libtool
-
-            - name: Build (Linux/macOS)
-              if: runner.os != 'Windows'
+            - name: Build
               run: |
                   chmod +x scripts/build-${{ inputs.software }}.sh
-                  ./scripts/build-${{ inputs.software }}.sh "${{ inputs.version }}" "${{ matrix.platform }}"
-
-            - name: Build (Windows)
-              if: runner.os == 'Windows'
-              shell: msys2 {0}
-              run: |
                   ./scripts/build-${{ inputs.software }}.sh "${{ inputs.version }}" "${{ matrix.platform }}"
 
             - name: Upload artifacts

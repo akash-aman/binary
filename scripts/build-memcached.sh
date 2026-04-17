@@ -2,7 +2,7 @@
 # ──────────────────────────────────────────────────────────────
 # Build Memcached from source (with static libevent)
 # Usage: build-memcached.sh <version> <platform>
-# Platforms: linux-amd64, darwin-amd64, darwin-arm64, windows-amd64
+# Platforms: linux-amd64, darwin-arm64
 #
 # Builds libevent as a static library first, then links memcached
 # against it. Based on gowp's setup-memcached-macos.sh pattern.
@@ -52,22 +52,13 @@ cd "$BUILD_DIR"
 tar xzf "$LIBEVENT_TAR"
 cd "libevent-$LIBEVENT_VERSION"
 
-# Older libevent samples/tests have pointer-type issues with newer GCC (14+)
-# on Windows/MinGW. These are hard errors in GCC 14, not just warnings.
-# Fully disable since we only need the static library, not samples/tests.
-LIBEVENT_CFLAGS=""
-if [ "$PLATFORM" = "windows-amd64" ]; then
-    LIBEVENT_CFLAGS="-Wno-incompatible-pointer-types -Wno-int-conversion"
-fi
-
 ./configure \
     --prefix="$LIBEVENT_PREFIX" \
     --disable-shared \
     --enable-static \
     --disable-openssl \
     --disable-debug-mode \
-    --quiet \
-    ${LIBEVENT_CFLAGS:+CFLAGS="$LIBEVENT_CFLAGS"}
+    --quiet
 
 make -j"$JOBS"
 make install
@@ -118,16 +109,8 @@ case "$PLATFORM" in
             --quiet \
             LDFLAGS="-static"
         ;;
-    darwin-amd64|darwin-arm64)
+    darwin-arm64)
         # macOS: static libevent, dynamic system libs
-        ./configure \
-            --with-libevent="$LIBEVENT_PREFIX" \
-            --disable-coverage \
-            --disable-docs \
-            --quiet
-        ;;
-    windows-amd64)
-        # Windows/MSYS2: best-effort build
         ./configure \
             --with-libevent="$LIBEVENT_PREFIX" \
             --disable-coverage \
@@ -143,15 +126,7 @@ esac
 make -j"$JOBS"
 
 # ── Collect binary ───────────────────────────────────────────
-if [ "$PLATFORM" = "windows-amd64" ]; then
-    if [ -f "memcached.exe" ]; then
-        cp memcached.exe "$OUTPUT_DIR/"
-    elif [ -f "memcached" ]; then
-        cp memcached "$OUTPUT_DIR/memcached.exe"
-    fi
-else
-    cp memcached "$OUTPUT_DIR/"
-fi
+cp memcached "$OUTPUT_DIR/"
 
 chmod +x "$OUTPUT_DIR"/* 2>/dev/null || true
 

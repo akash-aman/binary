@@ -2,7 +2,7 @@
 # ──────────────────────────────────────────────────────────────
 # Build Redis from source
 # Usage: build-redis.sh <version> <platform>
-# Platforms: linux-amd64, darwin-amd64, darwin-arm64, windows-amd64
+# Platforms: linux-amd64, darwin-arm64
 #
 # Outputs binaries to ./output/
 # ──────────────────────────────────────────────────────────────
@@ -44,13 +44,8 @@ case "$PLATFORM" in
             MALLOC=libc \
             LDFLAGS="-static"
         ;;
-    darwin-amd64|darwin-arm64)
+    darwin-arm64)
         # macOS: dynamic system libs (Apple doesn't allow fully static)
-        make -j"$JOBS" \
-            MALLOC=libc
-        ;;
-    windows-amd64)
-        # Windows/MSYS2: best-effort build
         make -j"$JOBS" \
             MALLOC=libc
         ;;
@@ -68,11 +63,7 @@ BINARIES="redis-server redis-cli redis-benchmark"
 
 for bin in $BINARIES; do
     if [ -f "src/$bin" ]; then
-        if [ "$PLATFORM" = "windows-amd64" ]; then
-            cp "src/$bin" "$OUTPUT_DIR/${bin}.exe"
-        else
-            cp "src/$bin" "$OUTPUT_DIR/$bin"
-        fi
+        cp "src/$bin" "$OUTPUT_DIR/$bin"
         SIZE=$(ls -lh "src/$bin" | awk '{print $5}')
         echo "  ✓ $bin ($SIZE)"
     else
