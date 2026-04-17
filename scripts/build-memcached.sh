@@ -52,11 +52,12 @@ cd "$BUILD_DIR"
 tar xzf "$LIBEVENT_TAR"
 cd "libevent-$LIBEVENT_VERSION"
 
-# Older libevent samples have pointer-type issues with newer GCC on Windows.
-# Suppress the warning-as-error since we only need the static library.
+# Older libevent samples/tests have pointer-type issues with newer GCC (14+)
+# on Windows/MinGW. These are hard errors in GCC 14, not just warnings.
+# Fully disable since we only need the static library, not samples/tests.
 LIBEVENT_CFLAGS=""
 if [ "$PLATFORM" = "windows-amd64" ]; then
-    LIBEVENT_CFLAGS="-Wno-error=incompatible-pointer-types"
+    LIBEVENT_CFLAGS="-Wno-incompatible-pointer-types -Wno-int-conversion"
 fi
 
 ./configure \

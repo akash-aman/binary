@@ -89,8 +89,17 @@ jobs:
               uses: actions/download-artifact@v4
               with:
                   pattern: ${{ inputs.software }}-*-${{ inputs.version }}
-                  path: artifacts/
+                  path: /tmp/artifacts
               continue-on-error: true
+
+            - name: Debug artifacts
+              if: steps.download.outcome == 'success'
+              run: |
+                  echo "=== Downloaded artifacts ==="
+                  find /tmp/artifacts -type f | head -50
+                  echo ""
+                  echo "=== Directory structure ==="
+                  ls -laR /tmp/artifacts/ || echo "No artifacts directory"
 
             - name: Push to binary branch
               if: steps.download.outcome == 'success'
@@ -105,7 +114,6 @@ jobs:
                   else
                     git checkout --orphan binary
                     git rm -rf --ignore-unmatch . 2>/dev/null || true
-                    # Clean any leftover untracked files from main checkout
                     git clean -fd 2>/dev/null || true
                   fi
 
@@ -113,7 +121,7 @@ jobs:
                   VERSION="${{ inputs.version }}"
                   CHANGED=false
 
-                  for artifact_dir in artifacts/*/; do
+                  for artifact_dir in /tmp/artifacts/*/; do
                     [ -d "$artifact_dir" ] || continue
                     DIRNAME=$(basename "$artifact_dir")
                     # Artifact name format: software-platform-version
