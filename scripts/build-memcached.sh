@@ -102,30 +102,33 @@ echo "[4/4] Compiling Memcached $VERSION..."
 case "$PLATFORM" in
     linux-amd64)
         # Static build on Linux
-        # Older memcached has deprecated/prototype warnings that are -Werror'd
         ./configure \
             --with-libevent="$LIBEVENT_PREFIX" \
             --disable-coverage \
             --disable-docs \
             --quiet \
-            CFLAGS="-O2 -pthread -Wall -Wno-error" \
             LDFLAGS="-static"
         ;;
     darwin-arm64)
         # macOS: static libevent, dynamic system libs
-        # Older memcached has deprecated/prototype warnings that are -Werror'd
         ./configure \
             --with-libevent="$LIBEVENT_PREFIX" \
             --disable-coverage \
             --disable-docs \
-            --quiet \
-            CFLAGS="-O2 -Wall -Wno-error"
+            --quiet
         ;;
     *)
         echo "✗ Unknown platform: $PLATFORM"
         exit 1
         ;;
 esac
+
+# Strip -Werror from generated Makefiles.
+# Older memcached (1.4.x, 1.5.x) has code that triggers warnings treated
+# as errors on modern compilers (deprecated sigignore, missing prototypes,
+# format-truncation). Memcached's configure hardcodes -Werror in AM_CFLAGS
+# which appears AFTER user CFLAGS, so we can't override via CFLAGS.
+find . -name Makefile -exec sed -i.bak 's/-Werror//g' {} +
 
 make -j"$JOBS"
 
