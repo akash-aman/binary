@@ -89,10 +89,23 @@ fi
 
 cd "$MEMCACHED_SRC"
 
+# Strip -Werror and -pedantic from build templates BEFORE configure/autogen.
+# Older memcached (1.4.x, 1.5.x) has code that triggers warnings treated as
+# errors on modern compilers (deprecated sigignore, missing prototypes,
+# format-truncation). memcached's Makefile.am hardcodes -Werror in AM_CFLAGS,
+# which gets baked into Makefile.in (by automake) and then Makefile (by
+# configure). We must strip BEFORE configure so the generated files are clean,
+# otherwise `make` may regenerate them via config.status and reintroduce it.
+echo "  Stripping -Werror from build templates..."
+find . \( -name Makefile.am -o -name Makefile.in \) \
+    -exec sed -i.bak -e 's/-Werror//g' -e 's/-pedantic//g' {} +
+
 # If from GitHub source (no configure), run autogen
 if [ ! -f "configure" ] && [ -f "autogen.sh" ]; then
     echo "  Running autogen..."
     ./autogen.sh
+    # autogen regenerates Makefile.in from Makefile.am — strip again
+    find . -name Makefile.in -exec sed -i.bak -e 's/-Werror//g' -e 's/-pedantic//g' {} +
 fi
 
 # ── Step 4: Compile ──────────────────────────────────────────
@@ -123,12 +136,9 @@ case "$PLATFORM" in
         ;;
 esac
 
-# Strip -Werror from generated Makefiles.
-# Older memcached (1.4.x, 1.5.x) has code that triggers warnings treated
-# as errors on modern compilers (deprecated sigignore, missing prototypes,
-# format-truncation). Memcached's configure hardcodes -Werror in AM_CFLAGS
-# which appears AFTER user CFLAGS, so we can't override via CFLAGS.
-find . -name Makefile -exec sed -i.bak 's/-Werror//g' {} +
+# Final safety net: also strip from generated Makefile in case any path
+# re-introduced it (e.g., subdirs not covered above).
+find . -name Makefile -exec sed -i.bak -e 's/-Werror//g' -e 's/-pedantic//g' {} +
 
 make -j"$JOBS"
 
