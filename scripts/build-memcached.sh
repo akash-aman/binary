@@ -89,24 +89,27 @@ fi
 
 cd "$MEMCACHED_SRC"
 
-# Strip -Werror and -pedantic from build templates BEFORE configure/autogen.
+# Strip -Werror and -pedantic from Makefile.in BEFORE configure.
 # Older memcached (1.4.x, 1.5.x) has code that triggers warnings treated as
 # errors on modern compilers (deprecated sigignore, missing prototypes,
 # format-truncation). memcached's Makefile.am hardcodes -Werror in AM_CFLAGS,
-# which gets baked into Makefile.in (by automake) and then Makefile (by
-# configure). We must strip BEFORE configure so the generated files are clean,
-# otherwise `make` may regenerate them via config.status and reintroduce it.
-echo "  Stripping -Werror from build templates..."
-find . \( -name Makefile.am -o -name Makefile.in \) \
-    -exec sed -i.bak -e 's/-Werror//g' -e 's/-pedantic//g' {} +
+# baked into Makefile.in. We patch Makefile.in (not Makefile.am) so make
+# doesn't try to regenerate it via automake (which may not be installed).
+strip_werror() {
+    find . -name Makefile.in -exec sed -i.bak \
+        -e 's/-Werror//g' -e 's/-pedantic//g' {} +
+    # Bump mtime so make doesn't try to regenerate from Makefile.am
+    find . -name Makefile.in -exec touch {} +
+}
 
-# If from GitHub source (no configure), run autogen
+# If from GitHub source (no configure), run autogen first
 if [ ! -f "configure" ] && [ -f "autogen.sh" ]; then
     echo "  Running autogen..."
     ./autogen.sh
-    # autogen regenerates Makefile.in from Makefile.am — strip again
-    find . -name Makefile.in -exec sed -i.bak -e 's/-Werror//g' -e 's/-pedantic//g' {} +
 fi
+
+echo "  Stripping -Werror from Makefile.in..."
+strip_werror
 
 # ── Step 4: Compile ──────────────────────────────────────────
 echo ""
@@ -139,6 +142,8 @@ esac
 # Final safety net: also strip from generated Makefile in case any path
 # re-introduced it (e.g., subdirs not covered above).
 find . -name Makefile -exec sed -i.bak -e 's/-Werror//g' -e 's/-pedantic//g' {} +
+# Bump mtime so make doesn't try to regenerate from Makefile.in
+find . -name Makefile -exec touch {} +
 
 make -j"$JOBS"
 
