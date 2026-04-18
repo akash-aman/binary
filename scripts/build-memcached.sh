@@ -117,21 +117,31 @@ echo "[4/4] Compiling Memcached $VERSION..."
 
 case "$PLATFORM" in
     linux-amd64)
-        # Static build on Linux
+        # Static build on Linux.
+        # -fcommon: GCC 10+ defaults to -fno-common, which breaks older
+        #   memcached (1.4.x, 1.5.x) where `hash` is declared in hash.h
+        #   without `extern`, causing "multiple definition" link errors.
         ./configure \
             --with-libevent="$LIBEVENT_PREFIX" \
             --disable-coverage \
             --disable-docs \
             --quiet \
+            CFLAGS="-O2 -fcommon" \
             LDFLAGS="-static"
         ;;
     darwin-arm64)
-        # macOS: static libevent, dynamic system libs
+        # macOS: static libevent, dynamic system libs.
+        # -DHAVE_HTONLL=1: macOS defines htonll as a macro; older memcached
+        #   (1.5.x) declares `extern uint64_t htonll(...)` in util.h which
+        #   conflicts with macro expansion. Defining HAVE_HTONLL skips the
+        #   extern and uses the system macro directly.
+        # -fcommon: same reason as linux for older versions.
         ./configure \
             --with-libevent="$LIBEVENT_PREFIX" \
             --disable-coverage \
             --disable-docs \
-            --quiet
+            --quiet \
+            CFLAGS="-O2 -fcommon -DHAVE_HTONLL=1"
         ;;
     *)
         echo "✗ Unknown platform: $PLATFORM"
