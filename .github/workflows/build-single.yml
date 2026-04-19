@@ -65,8 +65,6 @@ jobs:
     if: always() && !cancelled()
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Download artifacts
         id: download
@@ -85,58 +83,56 @@ jobs:
           echo "=== Directory structure ==="
           ls -laR /tmp/artifacts/ || echo "No artifacts directory"
 
-      - name: Push to binary branch
+      - name: Upload to GitHub Release
         if: steps.download.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Switch to binary branch (create orphan if it doesn't exist)
-          if git ls-remote --heads origin binary | grep -q binary; then
-            git fetch origin binary
-            git checkout binary
-          else
-            git checkout --orphan binary
-            git rm -rf --ignore-unmatch . 2>/dev/null || true
-            git clean -fd 2>/dev/null || true
-          fi
+          set -euo pipefail
 
           SOFTWARE="${{ inputs.software }}"
           VERSION="${{ inputs.version }}"
-          CHANGED=false
+          TAG="${SOFTWARE}-${VERSION}"
+          STAGE=/tmp/release-stage
+          mkdir -p "$STAGE"
 
+          # Pack each platform's output into <platform>.tar.gz
+          # (deterministic flags for reproducibility, -9 for max compression)
+          ANY_PACKED=false
           for artifact_dir in /tmp/artifacts/*/; do
             [ -d "$artifact_dir" ] || continue
             DIRNAME=$(basename "$artifact_dir")
-            # Artifact name format: software-platform-version
             PLATFORM=$(echo "$DIRNAME" | sed "s/^${SOFTWARE}-//;s/-${VERSION}$//")
+            TARBALL="${STAGE}/${PLATFORM}.tar.gz"
 
-            DEST_DIR="${SOFTWARE}/${PLATFORM}"
-            TARBALL="${DEST_DIR}/${VERSION}.tar.gz"
-            mkdir -p "$DEST_DIR"
-
-            # Pack the whole artifact payload into a single tarball so we store
-            # one file per (software, platform, version) instead of thousands.
-            # gzip -9 for max compression; deterministic flags for reproducibility.
             tar -czf "$TARBALL" \
                 --owner=0 --group=0 --numeric-owner \
                 -C "$artifact_dir" .
 
             SIZE=$(du -h "$TARBALL" | cut -f1)
             COUNT=$(tar -tzf "$TARBALL" | wc -l | tr -d ' ')
-            echo "✓ ${TARBALL} — ${SIZE}, ${COUNT} files"
-            CHANGED=true
+            echo "✓ ${PLATFORM}.tar.gz — ${SIZE}, ${COUNT} files"
+            ANY_PACKED=true
           done
 
-          if [ "$CHANGED" = true ]; then
-            git add .
-            if git diff --cached --quiet; then
-              echo "No changes to commit (tarballs identical)"
-            else
-              git commit -m "Add ${SOFTWARE} ${VERSION} binaries"
-              git push origin binary
-              echo "✅ Pushed ${SOFTWARE} ${VERSION} to binary branch"
-            fi
-          else
-            echo "⚠ No artifacts found — nothing to push"
+          if [ "$ANY_PACKED" != true ]; then
+            echo "⚠ No artifacts packed — nothing to release"
+            exit 0
           fi
+
+          # Create the release if missing, else reuse it. Upload tarballs as assets;
+          # --clobber replaces any existing asset with the same name (enables re-runs).
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Creating release $TAG..."
+            gh release create "$TAG" \
+              --title "${SOFTWARE} ${VERSION}" \
+              --notes "Prebuilt ${SOFTWARE} ${VERSION} binaries." \
+              --latest=false
+          else
+            echo "Release $TAG exists — updating assets..."
+          fi
+
+          gh release upload "$TAG" "$STAGE"/*.tar.gz --clobber
+          echo "✅ Uploaded assets to release $TAG"
+          gh release view "$TAG" --json assets \
+            --jq '.assets[] | "  \(.name) — \(.size) bytes"'

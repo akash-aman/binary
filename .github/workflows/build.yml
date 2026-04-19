@@ -17,6 +17,8 @@ jobs:
 
       - name: Filter versions that need building
         id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -25,11 +27,13 @@ jobs:
             exit 1
           fi
 
-          # Get file list from binary branch (empty if branch doesn't exist)
+          # Fetch list of existing release assets. One release per (software, version),
+          # tag format: <software>-<version>. Assets: <platform>.tar.gz.
+          # Use gh to list releases, collect "<tag>/<asset_name>" lines.
           EXISTING=""
-          if git ls-remote --heads origin binary | grep -q binary; then
-            git fetch origin binary --quiet
-            EXISTING=$(git ls-tree -r --name-only origin/binary 2>/dev/null || echo "")
+          if command -v gh >/dev/null 2>&1; then
+            EXISTING=$(gh release list --limit 1000 --json tagName,assets \
+              --jq '.[] | .tagName as $t | .assets[] | "\($t)/\(.name)"' 2>/dev/null || echo "")
           fi
 
           MATRIX="[]"
@@ -43,12 +47,13 @@ jobs:
             for version in $(jq -r --arg s "$software" '.[$s].versions[]' versions.json); do
               NEEDS_BUILD=false
               MISSING=""
+              TAG="${software}-${version}"
 
               for platform in $PLATFORMS; do
-                # Each build produces one tarball per (software, platform, version).
-                path="${software}/${platform}/${version}.tar.gz"
+                # Each build produces one release asset per (software, platform, version).
+                asset="${TAG}/${platform}.tar.gz"
 
-                if [ -z "$EXISTING" ] || ! echo "$EXISTING" | grep -Fxq "$path"; then
+                if [ -z "$EXISTING" ] || ! echo "$EXISTING" | grep -Fxq "$asset"; then
                   NEEDS_BUILD=true
                   MISSING="${MISSING} ${platform}"
                 fi
