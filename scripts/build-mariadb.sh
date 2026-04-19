@@ -92,6 +92,7 @@ case "$PLATFORM" in
         # Disable optional components to speed up build and keep output small.
         cmake .. \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             -DCMAKE_INSTALL_PREFIX="$OUTPUT_DIR" \
             -DINSTALL_LAYOUT=STANDALONE \
             -DWITH_SSL=bundled \

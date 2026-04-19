@@ -30,7 +30,6 @@
         "sentinel_win64": "bin/mysqld.exe",
         "runners": {
             "linux-amd64": "ubuntu-latest",
-            "darwin-x86_64": "macos-13",
             "darwin-arm64": "macos-14",
             "win64": "windows-latest"
         },
