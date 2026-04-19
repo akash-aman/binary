@@ -1,14 +1,45 @@
 {
-    "redis": [
-        "8.6.2",
-        "8.4.2",
-        "8.2.5",
-        "8.0.6",
-        "7.4.8"
-    ],
-    "memcached": [
-        "1.6.41",
-        "1.5.22",
-        "1.4.39"
-    ]
+    "redis": {
+        "sentinel": "redis-server",
+        "runners": {
+            "linux-amd64": "ubuntu-latest",
+            "darwin-arm64": "macos-14"
+        },
+        "versions": [
+            "8.6.2",
+            "8.4.2",
+            "8.2.5",
+            "8.0.6",
+            "7.4.8"
+        ]
+    },
+    "memcached": {
+        "sentinel": "memcached",
+        "runners": {
+            "linux-amd64": "ubuntu-latest",
+            "darwin-arm64": "macos-14"
+        },
+        "versions": [
+            "1.6.41",
+            "1.5.22",
+            "1.4.39"
+        ]
+    },
+    "mariadb": {
+        "sentinel": "bin/mysqld",
+        "sentinel_win64": "bin/mysqld.exe",
+        "runners": {
+            "linux-amd64": "ubuntu-latest",
+            "darwin-x86_64": "macos-13",
+            "darwin-arm64": "macos-14",
+            "win64": "windows-latest"
+        },
+        "versions": [
+            "11.4.4",
+            "10.11.10",
+            "10.6.20",
+            "10.5.27",
+            "10.4.34"
+        ]
+    }
 }

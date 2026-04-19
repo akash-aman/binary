@@ -1,91 +1,100 @@
 name: Build Binaries
 
 on:
-    workflow_dispatch:
+  workflow_dispatch:
 
 permissions:
-    contents: write
+  contents: write
 
 jobs:
-    check-versions:
-        runs-on: ubuntu-latest
-        outputs:
-            matrix: ${{ steps.filter.outputs.matrix }}
-            has_builds: ${{ steps.filter.outputs.has_builds }}
-        steps:
-            - uses: actions/checkout@v4
+  check-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.filter.outputs.matrix }}
+      has_builds: ${{ steps.filter.outputs.has_builds }}
+    steps:
+      - uses: actions/checkout@v4
 
-            - name: Filter versions that need building
-              id: filter
-              run: |
-                  if [ ! -f "versions.json" ]; then
-                    echo "::error::versions.json not found"
-                    exit 1
-                  fi
+      - name: Filter versions that need building
+        id: filter
+        run: |
+          set -euo pipefail
 
-                  # Get file list from binary branch (empty if branch doesn't exist)
-                  EXISTING=""
-                  if git ls-remote --heads origin binary | grep -q binary; then
-                    git fetch origin binary --quiet
-                    EXISTING=$(git ls-tree -r --name-only origin/binary 2>/dev/null || echo "")
-                  fi
+          if [ ! -f "versions.json" ]; then
+            echo "::error::versions.json not found"
+            exit 1
+          fi
 
-                  MATRIX="[]"
+          # Get file list from binary branch (empty if branch doesn't exist)
+          EXISTING=""
+          if git ls-remote --heads origin binary | grep -q binary; then
+            git fetch origin binary --quiet
+            EXISTING=$(git ls-tree -r --name-only origin/binary 2>/dev/null || echo "")
+          fi
 
-                  for software in $(jq -r 'keys[] | select(startswith("_") | not)' versions.json); do
-                    for version in $(jq -r --arg s "$software" '.[$s][]' versions.json); do
-                      # Determine sentinel binary for this software
-                      case "$software" in
-                        redis) CHECK_FILE="redis-server" ;;
-                        memcached) CHECK_FILE="memcached" ;;
-                        *) CHECK_FILE="$software" ;;
-                      esac
+          MATRIX="[]"
 
-                      # Check if all 4 platforms already have the binary
-                      NEEDS_BUILD=false
-                      MISSING=""
+          # Iterate software keys (skip any that start with _)
+          for software in $(jq -r 'keys[] | select(startswith("_") | not)' versions.json); do
+            # Read per-software config
+            PLATFORMS=$(jq -r --arg s "$software" '.[$s].runners | keys[]' versions.json)
+            RUNNERS_JSON=$(jq -c --arg s "$software" '[.[$s].runners | to_entries[] | {platform: .key, runner: .value}]' versions.json)
+            DEFAULT_SENTINEL=$(jq -r --arg s "$software" '.[$s].sentinel // $s' versions.json)
 
-                      for platform in linux-amd64 darwin-arm64; do
-                        path="${software}/${platform}/${version}/${CHECK_FILE}"
+            for version in $(jq -r --arg s "$software" '.[$s].versions[]' versions.json); do
+              NEEDS_BUILD=false
+              MISSING=""
 
-                        if [ -z "$EXISTING" ] || ! echo "$EXISTING" | grep -Fxq "$path"; then
-                          NEEDS_BUILD=true
-                          MISSING="${MISSING} ${platform}"
-                        fi
-                      done
+              for platform in $PLATFORMS; do
+                # Per-platform sentinel override (e.g. sentinel_win64), else default
+                SENTINEL=$(jq -r --arg s "$software" --arg k "sentinel_${platform}" \
+                  '.[$s][$k] // empty' versions.json)
+                [ -z "$SENTINEL" ] && SENTINEL="$DEFAULT_SENTINEL"
 
-                      if [ "$NEEDS_BUILD" = true ]; then
-                        echo "🔨 $software $version — needs build (missing:$MISSING)"
-                        MATRIX=$(echo "$MATRIX" | jq -c --arg s "$software" --arg v "$version" \
-                          '. + [{"software": $s, "version": $v}]')
-                      else
-                        echo "⏭  $software $version — skipped (all platforms present)"
-                      fi
-                    done
-                  done
+                path="${software}/${platform}/${version}/${SENTINEL}"
 
-                  echo "matrix={\"include\":$MATRIX}" >> "$GITHUB_OUTPUT"
+                if [ -z "$EXISTING" ] || ! echo "$EXISTING" | grep -Fxq "$path"; then
+                  NEEDS_BUILD=true
+                  MISSING="${MISSING} ${platform}"
+                fi
+              done
 
-                  if [ "$MATRIX" = "[]" ]; then
-                    echo "has_builds=false" >> "$GITHUB_OUTPUT"
-                    echo ""
-                    echo "✅ All versions already built. Nothing to do."
-                  else
-                    echo "has_builds=true" >> "$GITHUB_OUTPUT"
-                    echo ""
-                    echo "📋 Build queue:"
-                    echo "$MATRIX" | jq -r '.[] | "  → \(.software) \(.version)"'
-                  fi
+              if [ "$NEEDS_BUILD" = true ]; then
+                echo "🔨 $software $version — needs build (missing:$MISSING)"
+                MATRIX=$(echo "$MATRIX" | jq -c \
+                  --arg s "$software" \
+                  --arg v "$version" \
+                  --argjson r "$RUNNERS_JSON" \
+                  '. + [{"software": $s, "version": $v, "runners": $r}]')
+              else
+                echo "⏭  $software $version — skipped (all platforms present)"
+              fi
+            done
+          done
 
-    build-version:
-        needs: check-versions
-        if: needs.check-versions.outputs.has_builds == 'true'
-        strategy:
-            max-parallel: 1
-            fail-fast: false
-            matrix: ${{ fromJson(needs.check-versions.outputs.matrix) }}
-        uses: ./.github/workflows/build-single.yml
-        with:
-            software: ${{ matrix.software }}
-            version: ${{ matrix.version }}
-        secrets: inherit
+          echo "matrix={\"include\":$MATRIX}" >> "$GITHUB_OUTPUT"
+
+          if [ "$MATRIX" = "[]" ]; then
+            echo "has_builds=false" >> "$GITHUB_OUTPUT"
+            echo ""
+            echo "✅ All versions already built. Nothing to do."
+          else
+            echo "has_builds=true" >> "$GITHUB_OUTPUT"
+            echo ""
+            echo "📋 Build queue:"
+            echo "$MATRIX" | jq -r '.[] | "  → \(.software) \(.version) [\(.runners | map(.platform) | join(", "))]"'
+          fi
+
+  build-version:
+    needs: check-versions
+    if: needs.check-versions.outputs.has_builds == 'true'
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix: ${{ fromJson(needs.check-versions.outputs.matrix) }}
+    uses: ./.github/workflows/build-single.yml
+    with:
+      software: ${{ matrix.software }}
+      version: ${{ matrix.version }}
+      runners: ${{ toJson(matrix.runners) }}
+    secrets: inherit
