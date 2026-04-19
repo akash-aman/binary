@@ -1,6 +1,5 @@
 {
     "redis": {
-        "sentinel": "redis-server",
         "runners": {
             "linux-amd64": "ubuntu-latest",
             "darwin-arm64": "macos-14"
@@ -14,7 +13,6 @@
         ]
     },
     "memcached": {
-        "sentinel": "memcached",
         "runners": {
             "linux-amd64": "ubuntu-latest",
             "darwin-arm64": "macos-14"
@@ -26,8 +24,6 @@
         ]
     },
     "mariadb": {
-        "sentinel": "bin/mysqld",
-        "sentinel_win64": "bin/mysqld.exe",
         "runners": {
             "linux-amd64": "ubuntu-latest",
             "darwin-arm64": "macos-14",

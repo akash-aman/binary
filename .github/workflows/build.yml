@@ -39,19 +39,14 @@ jobs:
             # Read per-software config
             PLATFORMS=$(jq -r --arg s "$software" '.[$s].runners | keys[]' versions.json)
             RUNNERS_JSON=$(jq -c --arg s "$software" '[.[$s].runners | to_entries[] | {platform: .key, runner: .value}]' versions.json)
-            DEFAULT_SENTINEL=$(jq -r --arg s "$software" '.[$s].sentinel // $s' versions.json)
 
             for version in $(jq -r --arg s "$software" '.[$s].versions[]' versions.json); do
               NEEDS_BUILD=false
               MISSING=""
 
               for platform in $PLATFORMS; do
-                # Per-platform sentinel override (e.g. sentinel_win64), else default
-                SENTINEL=$(jq -r --arg s "$software" --arg k "sentinel_${platform}" \
-                  '.[$s][$k] // empty' versions.json)
-                [ -z "$SENTINEL" ] && SENTINEL="$DEFAULT_SENTINEL"
-
-                path="${software}/${platform}/${version}/${SENTINEL}"
+                # Each build produces one tarball per (software, platform, version).
+                path="${software}/${platform}/${version}.tar.gz"
 
                 if [ -z "$EXISTING" ] || ! echo "$EXISTING" | grep -Fxq "$path"; then
                   NEEDS_BUILD=true

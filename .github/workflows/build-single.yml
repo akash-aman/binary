@@ -111,18 +111,27 @@ jobs:
             # Artifact name format: software-platform-version
             PLATFORM=$(echo "$DIRNAME" | sed "s/^${SOFTWARE}-//;s/-${VERSION}$//")
 
-            DEST="${SOFTWARE}/${PLATFORM}/${VERSION}"
-            mkdir -p "$DEST"
-            cp -r "${artifact_dir}"* "$DEST/"
+            DEST_DIR="${SOFTWARE}/${PLATFORM}"
+            TARBALL="${DEST_DIR}/${VERSION}.tar.gz"
+            mkdir -p "$DEST_DIR"
+
+            # Pack the whole artifact payload into a single tarball so we store
+            # one file per (software, platform, version) instead of thousands.
+            # gzip -9 for max compression; deterministic flags for reproducibility.
+            tar -czf "$TARBALL" \
+                --owner=0 --group=0 --numeric-owner \
+                -C "$artifact_dir" .
+
+            SIZE=$(du -h "$TARBALL" | cut -f1)
+            COUNT=$(tar -tzf "$TARBALL" | wc -l | tr -d ' ')
+            echo "✓ ${TARBALL} — ${SIZE}, ${COUNT} files"
             CHANGED=true
-            echo "✓ ${DEST}/"
-            ls -lh "$DEST/" | head -20
           done
 
           if [ "$CHANGED" = true ]; then
             git add .
             if git diff --cached --quiet; then
-              echo "No changes to commit (binaries identical)"
+              echo "No changes to commit (tarballs identical)"
             else
               git commit -m "Add ${SOFTWARE} ${VERSION} binaries"
               git push origin binary
