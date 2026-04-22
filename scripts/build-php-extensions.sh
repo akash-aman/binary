@@ -34,7 +34,10 @@ case "$VERSION" in
     *)               IGBINARY_VER="3.2.17RC1" ;;  # PHP 8.5+ support
 esac
 APCU_VER="5.1.24"
-YAML_VER="2.2.4"
+case "$VERSION" in
+    8.1|8.2|8.3|8.4) YAML_VER="2.2.4" ;;
+    *)               YAML_VER="2.3.0" ;;  # PHP 8.5+ support
+esac
 MSGPACK_VER="2.2.0RC2"
 REDIS_VER="6.2.0"
 MEMCACHED_VER="3.3.0"
