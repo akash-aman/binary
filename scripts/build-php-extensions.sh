@@ -75,13 +75,25 @@ case "$PLATFORM" in
         # shellcheck disable=SC2086
         brew install \
             "php@${VERSION}" \
-            autoconf pkg-config re2c bison \
+            autoconf pkg-config re2c bison pcre2 \
             imagemagick libmemcached libyaml openssl@3 zlib 2>/dev/null || true
         PHP_PREFIX="$(brew --prefix "php@${VERSION}")"
         export PATH="$PHP_PREFIX/bin:$PHP_PREFIX/sbin:$PATH"
         PHP_CONFIG="$PHP_PREFIX/bin/php-config"
         PHPIZE="$PHP_PREFIX/bin/phpize"
         SUDO=""
+
+        # Homebrew's php@x includes <pcre2.h> from its public headers but
+        # doesn't ship the pcre2 headers itself. Wire brew's pcre2 include
+        # and lib paths into the compiler env so extension builds find it.
+        PCRE2_PREFIX="$(brew --prefix pcre2)"
+        OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+        ZLIB_PREFIX="$(brew --prefix zlib)"
+        LIBYAML_PREFIX="$(brew --prefix libyaml)"
+        LIBMEMCACHED_PREFIX="$(brew --prefix libmemcached)"
+        export CPPFLAGS="-I${PCRE2_PREFIX}/include -I${OPENSSL_PREFIX}/include -I${ZLIB_PREFIX}/include -I${LIBYAML_PREFIX}/include -I${LIBMEMCACHED_PREFIX}/include ${CPPFLAGS:-}"
+        export LDFLAGS="-L${PCRE2_PREFIX}/lib -L${OPENSSL_PREFIX}/lib -L${ZLIB_PREFIX}/lib -L${LIBYAML_PREFIX}/lib -L${LIBMEMCACHED_PREFIX}/lib ${LDFLAGS:-}"
+        export PKG_CONFIG_PATH="${PCRE2_PREFIX}/lib/pkgconfig:${OPENSSL_PREFIX}/lib/pkgconfig:${ZLIB_PREFIX}/lib/pkgconfig:${LIBYAML_PREFIX}/lib/pkgconfig:${LIBMEMCACHED_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
         ;;
     *)
         echo "✗ Unknown platform: $PLATFORM"
