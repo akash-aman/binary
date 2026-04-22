@@ -29,7 +29,10 @@ mkdir -p "$BUILD_DIR" "$EXT_DIR"
 
 # ── Pinned extension versions ────────────────────────────────
 # Bump here when you want newer extension releases.
-IGBINARY_VER="3.2.16"
+case "$VERSION" in
+    8.1|8.2|8.3|8.4) IGBINARY_VER="3.2.16" ;;
+    *)               IGBINARY_VER="3.2.17RC1" ;;  # PHP 8.5+ support
+esac
 APCU_VER="5.1.24"
 YAML_VER="2.2.4"
 MSGPACK_VER="2.2.0RC2"
@@ -60,10 +63,14 @@ case "$PLATFORM" in
         sudo add-apt-repository -y ppa:ondrej/php
         sudo apt-get update -qq
         sudo apt-get install -y -qq \
-            "php${VERSION}-cli" "php${VERSION}-dev" "php${VERSION}-opcache" \
+            "php${VERSION}-cli" "php${VERSION}-dev" \
             build-essential autoconf pkg-config re2c bison \
             libmagickwand-dev libmemcached-dev libyaml-dev \
             libssl-dev zlib1g-dev
+        # php-opcache is a separate package on older versions but bundled in
+        # newer ones (e.g. PHP 8.5 on ondrej/php). Install if available.
+        sudo apt-get install -y -qq "php${VERSION}-opcache" 2>/dev/null || \
+            echo "  (php${VERSION}-opcache package not available — opcache.so may be bundled with php-cli)"
         PHP_CONFIG="/usr/bin/php-config${VERSION}"
         PHPIZE="/usr/bin/phpize${VERSION}"
         SUDO="sudo"
