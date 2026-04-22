@@ -43,7 +43,10 @@ case "$VERSION" in
     8.1|8.2|8.3|8.4) REDIS_VER="6.2.0" ;;
     *)               REDIS_VER="6.3.0" ;;  # PHP 8.5+ support
 esac
-MEMCACHED_VER="3.3.0"
+case "$VERSION" in
+    8.1|8.2|8.3|8.4) MEMCACHED_VER="3.3.0" ;;
+    *)               MEMCACHED_VER="3.4.0" ;;  # PHP 8.5+ support
+esac
 
 # imagick: 3.7.0 misbuilds on PHP 8.4+; 3.8.0 adds 8.4 support.
 case "$VERSION" in
