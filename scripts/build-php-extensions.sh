@@ -39,7 +39,10 @@ case "$VERSION" in
     *)               YAML_VER="2.3.0" ;;  # PHP 8.5+ support
 esac
 MSGPACK_VER="2.2.0RC2"
-REDIS_VER="6.2.0"
+case "$VERSION" in
+    8.1|8.2|8.3|8.4) REDIS_VER="6.2.0" ;;
+    *)               REDIS_VER="6.3.0" ;;  # PHP 8.5+ support
+esac
 MEMCACHED_VER="3.3.0"
 
 # imagick: 3.7.0 misbuilds on PHP 8.4+; 3.8.0 adds 8.4 support.
