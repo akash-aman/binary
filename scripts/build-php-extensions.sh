@@ -67,6 +67,7 @@ case "$PLATFORM" in
         PHP_CONFIG="/usr/bin/php-config${VERSION}"
         PHPIZE="/usr/bin/phpize${VERSION}"
         SUDO="sudo"
+        LIBYAML_PREFIX="/usr"
         ;;
     darwin-arm64)
         echo ""
@@ -91,9 +92,10 @@ case "$PLATFORM" in
         ZLIB_PREFIX="$(brew --prefix zlib)"
         LIBYAML_PREFIX="$(brew --prefix libyaml)"
         LIBMEMCACHED_PREFIX="$(brew --prefix libmemcached)"
-        export CPPFLAGS="-I${PCRE2_PREFIX}/include -I${OPENSSL_PREFIX}/include -I${ZLIB_PREFIX}/include -I${LIBYAML_PREFIX}/include -I${LIBMEMCACHED_PREFIX}/include ${CPPFLAGS:-}"
-        export LDFLAGS="-L${PCRE2_PREFIX}/lib -L${OPENSSL_PREFIX}/lib -L${ZLIB_PREFIX}/lib -L${LIBYAML_PREFIX}/lib -L${LIBMEMCACHED_PREFIX}/lib ${LDFLAGS:-}"
-        export PKG_CONFIG_PATH="${PCRE2_PREFIX}/lib/pkgconfig:${OPENSSL_PREFIX}/lib/pkgconfig:${ZLIB_PREFIX}/lib/pkgconfig:${LIBYAML_PREFIX}/lib/pkgconfig:${LIBMEMCACHED_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+        IMAGEMAGICK_PREFIX="$(brew --prefix imagemagick)"
+        export CPPFLAGS="-I${PCRE2_PREFIX}/include -I${OPENSSL_PREFIX}/include -I${ZLIB_PREFIX}/include -I${LIBYAML_PREFIX}/include -I${LIBMEMCACHED_PREFIX}/include -I${IMAGEMAGICK_PREFIX}/include ${CPPFLAGS:-}"
+        export LDFLAGS="-L${PCRE2_PREFIX}/lib -L${OPENSSL_PREFIX}/lib -L${ZLIB_PREFIX}/lib -L${LIBYAML_PREFIX}/lib -L${LIBMEMCACHED_PREFIX}/lib -L${IMAGEMAGICK_PREFIX}/lib ${LDFLAGS:-}"
+        export PKG_CONFIG_PATH="${PCRE2_PREFIX}/lib/pkgconfig:${OPENSSL_PREFIX}/lib/pkgconfig:${ZLIB_PREFIX}/lib/pkgconfig:${LIBYAML_PREFIX}/lib/pkgconfig:${LIBMEMCACHED_PREFIX}/lib/pkgconfig:${IMAGEMAGICK_PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
         ;;
     *)
         echo "✗ Unknown platform: $PLATFORM"
@@ -195,7 +197,8 @@ build_ext apcu \
     "https://github.com/krakjoe/apcu/archive/refs/tags/v${APCU_VER}.tar.gz"
 
 build_ext yaml \
-    "https://pecl.php.net/get/yaml-${YAML_VER}.tgz"
+    "https://pecl.php.net/get/yaml-${YAML_VER}.tgz" \
+    "--with-yaml=${LIBYAML_PREFIX}"
 
 # ── redis with igbinary + msgpack serializer support ────────
 build_ext redis \
@@ -203,9 +206,13 @@ build_ext redis \
     "--enable-redis-igbinary --enable-redis-msgpack"
 
 # ── memcached with igbinary + msgpack + json serializer ─────
+MEMCACHED_CFG="--enable-memcached-igbinary --enable-memcached-msgpack --enable-memcached-json"
+if [ "$PLATFORM" = "darwin-arm64" ]; then
+    MEMCACHED_CFG="$MEMCACHED_CFG --with-libmemcached-dir=${LIBMEMCACHED_PREFIX}"
+fi
 build_ext memcached \
     "https://github.com/php-memcached-dev/php-memcached/archive/refs/tags/v${MEMCACHED_VER}.tar.gz" \
-    "--enable-memcached-igbinary --enable-memcached-msgpack --enable-memcached-json"
+    "$MEMCACHED_CFG"
 
 # ── imagick ──────────────────────────────────────────────────
 build_ext imagick \
