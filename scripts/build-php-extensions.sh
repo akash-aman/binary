@@ -208,7 +208,7 @@ build_ext redis \
 # ── memcached with igbinary + msgpack + json serializer ─────
 MEMCACHED_CFG="--enable-memcached-igbinary --enable-memcached-msgpack --enable-memcached-json"
 if [ "$PLATFORM" = "darwin-arm64" ]; then
-    MEMCACHED_CFG="$MEMCACHED_CFG --with-libmemcached-dir=${LIBMEMCACHED_PREFIX}"
+    MEMCACHED_CFG="$MEMCACHED_CFG --with-libmemcached-dir=${LIBMEMCACHED_PREFIX} --with-zlib-dir=${ZLIB_PREFIX}"
 fi
 build_ext memcached \
     "https://github.com/php-memcached-dev/php-memcached/archive/refs/tags/v${MEMCACHED_VER}.tar.gz" \
