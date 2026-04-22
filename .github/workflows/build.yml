@@ -29,11 +29,14 @@ jobs:
 
           # Fetch list of existing release assets. One release per (software, version),
           # tag format: <software>-<version>. Assets: <platform>.tar.gz.
-          # Use gh to list releases, collect "<tag>/<asset_name>" lines.
+          # `gh release list` can't emit assets, so use the REST API which includes
+          # them on each release object.
           EXISTING=""
           if command -v gh >/dev/null 2>&1; then
-            EXISTING=$(gh release list --limit 1000 --json tagName,assets \
-              --jq '.[] | .tagName as $t | .assets[] | "\($t)/\(.name)"' 2>/dev/null || echo "")
+            EXISTING=$(gh api \
+              --paginate \
+              "/repos/${GITHUB_REPOSITORY}/releases" \
+              --jq '.[] | .tag_name as $t | .assets[] | "\($t)/\(.name)"' 2>/dev/null || echo "")
           fi
 
           MATRIX="[]"
