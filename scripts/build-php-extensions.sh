@@ -36,7 +36,7 @@ MSGPACK_VER="2.2.0RC2"
 REDIS_VER="6.2.0"
 MEMCACHED_VER="3.3.0"
 
-# imagick: 3.7.0 misbuilds on PHP 8.4+; the 3.8.0 line adds 8.4/8.5 support.
+# imagick: 3.7.0 misbuilds on PHP 8.4+; 3.8.0 adds 8.4 support.
 case "$VERSION" in
     8.1|8.2|8.3) IMAGICK_VER="3.7.0" ;;
     *)           IMAGICK_VER="3.8.0" ;;
@@ -122,6 +122,9 @@ fi
 #   $2 url             tarball URL
 #   $3 configure_args  extra flags (optional)
 #   $4 install         "install" to also `make install` (optional)
+#
+# Fails hard (set -e) if the extension fails to build. The whole
+# bundle is all-or-nothing: we don't want to ship a partial release.
 build_ext() {
     local name="$1" url="$2" cfg_args="${3:-}" do_install="${4:-}"
     echo ""
@@ -144,14 +147,12 @@ build_ext() {
 
     make -j"$JOBS" >/dev/null
 
-    # Pick up the produced module (.so name may differ from ext name,
-    # e.g. "yaml" but the folder has multiple; we take the first .so).
+    # Pick up the produced module (.so name may differ from ext name).
     local so
     so=$(find modules -maxdepth 1 -name "*.so" | head -1)
     if [ -z "$so" ] || [ ! -f "$so" ]; then
         echo "  ✗ $name: no .so produced"
-        popd >/dev/null
-        return 1
+        exit 1
     fi
     cp "$so" "$EXT_DIR/"
     local sz
@@ -165,52 +166,41 @@ build_ext() {
     popd >/dev/null
 }
 
-# Track failures but keep going so one broken ext doesn't kill the bundle.
-FAILED=""
-try_ext() {
-    if ! build_ext "$@"; then
-        FAILED="$FAILED $1"
-    fi
-}
-
 # ── igbinary and msgpack first: redis/memcached can use them
 #    as serializers if their headers are installed. ──────────
-try_ext igbinary \
+build_ext igbinary \
     "https://github.com/igbinary/igbinary/archive/refs/tags/${IGBINARY_VER}.tar.gz" \
     "" \
     install
 
-try_ext msgpack \
+build_ext msgpack \
     "https://pecl.php.net/get/msgpack-${MSGPACK_VER}.tgz" \
     "" \
     install
 
 # ── Pure PECL extensions ─────────────────────────────────────
-try_ext apcu \
+build_ext apcu \
     "https://github.com/krakjoe/apcu/archive/refs/tags/v${APCU_VER}.tar.gz"
 
-try_ext yaml \
+build_ext yaml \
     "https://pecl.php.net/get/yaml-${YAML_VER}.tgz"
 
 # ── redis with igbinary + msgpack serializer support ────────
-try_ext redis \
+build_ext redis \
     "https://github.com/phpredis/phpredis/archive/refs/tags/${REDIS_VER}.tar.gz" \
     "--enable-redis-igbinary --enable-redis-msgpack"
 
 # ── memcached with igbinary + msgpack + json serializer ─────
-try_ext memcached \
+build_ext memcached \
     "https://github.com/php-memcached-dev/php-memcached/archive/refs/tags/v${MEMCACHED_VER}.tar.gz" \
     "--enable-memcached-igbinary --enable-memcached-msgpack --enable-memcached-json"
 
 # ── imagick ──────────────────────────────────────────────────
-# Note: imagick 3.7.0 targets ImageMagick 6. Ubuntu's libmagickwand-dev
-# ships IM6 so this works; macOS brew ships IM7 which may fail. We
-# continue on error so the rest of the bundle still builds.
-try_ext imagick \
+build_ext imagick \
     "https://pecl.php.net/get/imagick-${IMAGICK_VER}.tgz"
 
 # ── xdebug (zend_extension) ─────────────────────────────────
-try_ext xdebug \
+build_ext xdebug \
     "https://github.com/xdebug/xdebug/archive/refs/tags/${XDEBUG_VER}.tar.gz"
 
 # ── Write README with install instructions ──────────────────
@@ -249,9 +239,6 @@ EOF
 
 echo ""
 echo "══════════════════════════════════════════════"
-if [ -n "$FAILED" ]; then
-    echo "  ⚠ Some extensions failed to build:$FAILED"
-fi
 echo "  ✓ PHP $VERSION extensions for $PLATFORM"
 echo "══════════════════════════════════════════════"
 ls -lh "$EXT_DIR"

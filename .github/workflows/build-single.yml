@@ -62,7 +62,9 @@ jobs:
   push:
     needs: build
     runs-on: ubuntu-latest
-    if: always() && !cancelled()
+    # Only release if ALL matrix builds succeeded. We don't want to publish
+    # a partial release (e.g. linux-amd64 only) if one platform fails.
+    if: success()
     steps:
       - uses: actions/checkout@v4
 
@@ -132,7 +134,19 @@ jobs:
             echo "Release $TAG exists — updating assets..."
           fi
 
-          gh release upload "$TAG" "$STAGE"/*.tar.gz --clobber
+          # Retry upload: GitHub's release API is eventually-consistent,
+          # so a freshly-created release may 404 on upload for a few seconds.
+          for attempt in 1 2 3 4 5; do
+            if gh release upload "$TAG" "$STAGE"/*.tar.gz --clobber; then
+              break
+            fi
+            if [ "$attempt" = 5 ]; then
+              echo "✗ Upload failed after $attempt attempts"
+              exit 1
+            fi
+            echo "Upload attempt $attempt failed — retrying in 3s..."
+            sleep 3
+          done
           echo "✅ Uploaded assets to release $TAG"
           gh release view "$TAG" --json assets \
             --jq '.assets[] | "  \(.name) — \(.size) bytes"'
