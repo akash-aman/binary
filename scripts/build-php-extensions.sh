@@ -55,7 +55,10 @@ case "$VERSION" in
     *)           IMAGICK_VER="3.8.1" ;;
 esac
 
-XDEBUG_VER="3.4.5"
+case "$VERSION" in
+    8.1|8.2|8.3|8.4) XDEBUG_VER="3.4.5" ;;
+    *)               XDEBUG_VER="3.5.1" ;;  # PHP 8.5+ support
+esac
 
 echo "══════════════════════════════════════════════"
 echo "  PHP $VERSION extensions — $PLATFORM"
