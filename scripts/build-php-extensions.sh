@@ -48,10 +48,11 @@ case "$VERSION" in
     *)               MEMCACHED_VER="3.4.0" ;;  # PHP 8.5+ support
 esac
 
-# imagick: 3.7.0 misbuilds on PHP 8.4+; 3.8.0 adds 8.4 support.
+# imagick: 3.7.0 misbuilds on PHP 8.4+; 3.8.0 adds 8.4 support; 3.8.1 adds 8.5.
 case "$VERSION" in
     8.1|8.2|8.3) IMAGICK_VER="3.7.0" ;;
-    *)           IMAGICK_VER="3.8.0" ;;
+    8.4)         IMAGICK_VER="3.8.0" ;;
+    *)           IMAGICK_VER="3.8.1" ;;
 esac
 
 XDEBUG_VER="3.4.5"
